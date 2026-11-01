@@ -2,6 +2,11 @@
 .data/
 temp/
 classes/
+
+# Wichtige Java-Quellen trotz Ordnername "classes" versionieren
+!src/main/java/de/danielluedecke/zettelkasten/util/classes/
+!src/main/java/de/danielluedecke/zettelkasten/util/classes/**
+
 deploy/
 javadoc/
 cwallet.sso.lck
