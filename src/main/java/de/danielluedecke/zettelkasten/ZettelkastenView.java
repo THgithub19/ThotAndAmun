@@ -32,6 +32,7 @@
  */
 package de.danielluedecke.zettelkasten;
 
+import de.tobiashilbricht.thotandamun.TableDebugging;
 import com.explodingpixels.macwidgets.*;
 import com.explodingpixels.widgets.TableUtils;
 import de.danielluedecke.zettelkasten.database.*;
@@ -93,6 +94,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+// just for debugging
+import static de.tobiashilbricht.thotandamun.TableDebugging.*;
 
 /**
  * The application's main frame.
@@ -427,6 +430,17 @@ public class ZettelkastenView extends FrameView implements WindowListener, DropT
 		makeAutoBackupTimer = new Timer();
 		makeAutoBackupTimer.schedule(new AutoBackupTimer(), Constants.autobackupUpdateStart,
 				Constants.autobackupUpdateInterval);
+
+		//just for debugging tables
+		//installTableDebugging(jTableAuthors, "jTableAuthors");
+		//installTableDebugging(jTableBookmarks, "jTableBookmarks");
+
+		//dumpSorterState(jTableAuthors, "jTableAuthors");
+		//dumpSorterState(jTableBookmarks, "jTableBookmarks");
+
+		//dumpSorterState(jTableBookmarks, "jTableBookmarks after click");
+
+		//installTableModelDebugging(jTableBookmarks, "jTableBookmarks");
 	}
 
 	// Common code to prepare and start a foreground task in ZettelkastenView.
@@ -11033,33 +11047,69 @@ public class ZettelkastenView extends FrameView implements WindowListener, DropT
 
 		@Override
 		public void valueChanged(ListSelectionEvent e) {
+			// do nothing while table updates
 			if (tableUpdateActive) {
-				// Do nothing if there is an ongoing table update.
+				return;
+			}
+			// only react when selection has changed
+			if (e.getValueIsAdjusting()) {
+				return;
+			}
+			// no valid selection present
+			if (!hasValidSelection(table)) {
 				return;
 			}
 
-			// Get list selection model.
-			ListSelectionModel lsm = (ListSelectionModel) e.getSource();
-			// Set value-adjusting to true, so we don't fire multiple value-changed
-			// events.
-			lsm.setValueIsAdjusting(true);
 			if (table == jTableAuthors) {
 				showAuthorText();
+
 				if (setBibKeyDlg != null) {
 					setBibKeyDlg.initTitleAndBibkey();
 				}
+
 			} else if (table == jTableTitles) {
 				showEntryFromTitles();
+
 			} else if (table == jTableAttachments) {
 				showEntryFromAttachments();
+
 			} else if (table == jTableLinks) {
-				// If the user selects an entry from the links table, highlight the
-				// keyword in jListEntryKeywords that is responsible for the link.
 				updateDisplayedEntryAndKeywordsListWithSelectedEntryFromLinksInteraction();
+
 			} else if (table == jTableManLinks) {
 				updateDisplayedEntryWithSelectedEntryFromManualLinks();
+
 			} else if (table == jTableBookmarks) {
-				showEntryFromBookmarks();
+				// Single click selects for context menu, double click jumps to bookmark
+			}
+		}
+
+		// check for valid selection in Tables
+		private boolean hasValidSelection(JTable table) {
+			if (table == null) {
+				return false;
+			}
+
+			int viewRow = table.getSelectedRow();
+
+			// no row selected
+			if (viewRow < 0) {
+				return false;
+			}
+
+			// selected row out of allowed number of rows
+			if (viewRow >= table.getRowCount()) {
+				return false;
+			}
+
+			try {
+				int modelRow = table.convertRowIndexToModel(viewRow);
+
+				// check for correct modelrow
+				return modelRow >= 0 && modelRow < table.getModel().getRowCount();
+
+			} catch (IndexOutOfBoundsException ex) {
+				return false;
 			}
 		}
 	}
