@@ -32,7 +32,6 @@
  */
 package de.danielluedecke.zettelkasten;
 
-import de.tobiashilbricht.thotandamun.TableDebugging;
 import com.explodingpixels.macwidgets.*;
 import com.explodingpixels.widgets.TableUtils;
 import de.danielluedecke.zettelkasten.database.*;
@@ -94,8 +93,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-// just for debugging
-import static de.tobiashilbricht.thotandamun.TableDebugging.*;
 
 /**
  * The application's main frame.
@@ -5644,28 +5641,97 @@ public class ZettelkastenView extends FrameView implements WindowListener, DropT
 	 * (jTableBookmarks). This method is especially called from the mouse-clicked
 	 * and key-released events from the jTableBookmarks.
 	 */
+	private boolean restoreBookmarkSelectionActive = false;
+
+	private void restoreBookmarkSelection(int entryNumber) {
+		for (int modelRow = 0; modelRow < jTableBookmarks.getModel().getRowCount(); modelRow++) {
+			Object value = jTableBookmarks.getModel().getValueAt(modelRow, 0);
+
+			if (value == null) {
+				continue;
+			}
+
+			try {
+				int currentEntryNumber = Integer.parseInt(value.toString());
+
+				if (currentEntryNumber == entryNumber) {
+					int viewRow = jTableBookmarks.convertRowIndexToView(modelRow);
+
+					if (viewRow >= 0 && viewRow < jTableBookmarks.getRowCount()) {
+						jTableBookmarks.setRowSelectionInterval(viewRow, viewRow);
+					}
+
+					return;
+				}
+			} catch (NumberFormatException ex) {
+				// ignore invalid row
+			}
+		}
+	}
+
 	private void showEntryFromBookmarks() {
+		if (restoreBookmarkSelectionActive) {
+			return;
+		}
+
 		// if no data available, do nothing.
 		if (data.getCount(Daten.ZKNCOUNT) == 0) {
 			return;
 		}
+
 		// get the entry number from selected bookmark
 		int nr = ZettelkastenViewUtil.retrieveSelectedEntryFromTable(data, jTableBookmarks, 0);
-		// if no entry is selected, show current entry
-		if (-1 == nr) {
-			// clear textfield content
+
+		// if no entry is selected, do nothing
+		if (nr == -1) {
 			jEditorPaneBookmarkComment.setText("");
-			setNewDisplayedEntryAndUpdateDisplay(data.getActivatedEntryNumber());
-		} else {
-			// get the selected row
-			int row = jTableBookmarks.getSelectedRow();
-			// show comment of bookmark
-			String comment = (row != -1) ? bookmarks.getCommentAsHtml(row) : "";
-			// show comment
-			jEditorPaneBookmarkComment.setText(comment);
+			return;
+		}
+
+		int viewRow = jTableBookmarks.getSelectedRow();
+
+		if (viewRow < 0) {
+			return;
+		}
+
+		int modelRow = jTableBookmarks.convertRowIndexToModel(viewRow);
+
+		// show comment of bookmark
+		String comment = bookmarks.getCommentAsHtml(modelRow);
+		jEditorPaneBookmarkComment.setText(comment);
+
+		restoreBookmarkSelectionActive = true;
+
+		try {
 			setNewDisplayedEntryAndUpdateDisplay(nr);
+			restoreBookmarkSelection(nr);
+		} finally {
+			restoreBookmarkSelectionActive = false;
 		}
 	}
+
+//	private void showEntryFromBookmarks() {
+//		// if no data available, do nothing.
+//		if (data.getCount(Daten.ZKNCOUNT) == 0) {
+//			return;
+//		}
+//		// get the entry number from selected bookmark
+//		int nr = ZettelkastenViewUtil.retrieveSelectedEntryFromTable(data, jTableBookmarks, 0);
+//		// if no entry is selected, show current entry
+//		if (-1 == nr) {
+//			// clear textfield content
+//			jEditorPaneBookmarkComment.setText("");
+//			setNewDisplayedEntryAndUpdateDisplay(data.getActivatedEntryNumber());
+//		} else {
+//			// get the selected row
+//			int row = jTableBookmarks.getSelectedRow();
+//			// show comment of bookmark
+//			String comment = (row != -1) ? bookmarks.getCommentAsHtml(row) : "";
+//			// show comment
+//			jEditorPaneBookmarkComment.setText(comment);
+//			setNewDisplayedEntryAndUpdateDisplay(nr);
+//		}
+//	}
 
 	/*
 	 * displaySelectedEntryFromManualLinks is called whenever a selected entry is
@@ -11080,10 +11146,11 @@ public class ZettelkastenView extends FrameView implements WindowListener, DropT
 				updateDisplayedEntryWithSelectedEntryFromManualLinks();
 
 			} else if (table == jTableBookmarks) {
-				// Single click selects for context menu, double click jumps to bookmark
+
+				showEntryFromBookmarks();
+
 			}
 		}
-
 		// check for valid selection in Tables
 		private boolean hasValidSelection(JTable table) {
 			if (table == null) {
